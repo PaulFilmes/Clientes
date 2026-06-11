@@ -577,7 +577,7 @@ async function doGoogleLogin() {
   });
   const {error} = await supa.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.href }
+    options: { redirectTo: 'https://paulfilmes.github.io/Clientes/' }
   });
   if(error){
     ['btnGoogleLogin','btnGoogleReg'].forEach(id=>{
