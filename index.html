@@ -508,6 +508,7 @@ const SUPA_URL = 'https://zchlkfieegfrmdvovzht.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjaGxrZmllZWdmcm1kdm92emh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExODY4MDksImV4cCI6MjA5Njc2MjgwOX0.nkTy4DEpKxPqGx_I0LW5wKSeRnxGV-u19KTWqRpfX_c';
 const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
 const OWNER_EMAIL = 'juniorpaul1910@gmail.com';
+const SK_LOCAL = 'pf_v4'; // chave do localStorage com os dados antigos
 
 // ══════════════════════════════════════
 // STATE
@@ -515,11 +516,33 @@ const OWNER_EMAIL = 'juniorpaul1910@gmail.com';
 let currentUserId = null;
 let currentUserEmail = '';
 let D = {clients:[], nextId:1};
-let _appReady = false;   // evita duplo disparo do onAuthStateChange
-const MN=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const MN = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 // ══════════════════════════════════════
-// AUTH HELPERS
+// SHOW / HIDE APP
+// ══════════════════════════════════════
+function showLoginScreen() {
+  document.getElementById('authScreen').classList.remove('hidden');
+  document.getElementById('userBadge').style.display = 'none';
+}
+
+function showApp(user) {
+  document.getElementById('authScreen').classList.add('hidden');
+  const badge = document.getElementById('userBadge');
+  badge.style.display = 'flex';
+  const name = user.user_metadata?.full_name || user.email.split('@')[0];
+  const photo = user.user_metadata?.avatar_url || null;
+  document.getElementById('ubName').textContent = name.split(' ')[0];
+  const avEl = document.getElementById('ubAv');
+  if (photo) {
+    avEl.innerHTML = `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+  } else {
+    avEl.textContent = name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  }
+}
+
+// ══════════════════════════════════════
+// AUTH FORMS
 // ══════════════════════════════════════
 function switchTab(tab) {
   const isLogin = tab === 'login';
@@ -532,228 +555,247 @@ function switchTab(tab) {
 function clearAuthMsgs() {
   ['loginErr','regErr','regOk'].forEach(id => {
     const el = document.getElementById(id);
-    if(el){el.textContent='';el.classList.remove('show');}
+    if (el) { el.textContent = ''; el.classList.remove('show'); }
   });
 }
-function showErr(id,msg){const el=document.getElementById(id);if(el){el.textContent=msg;el.classList.add('show');}}
-function showOk(id,msg){const el=document.getElementById(id);if(el){el.textContent=msg;el.classList.add('show');}}
-function setLoading(btnId,loading,text){
-  const btn=document.getElementById(btnId);
-  if(!btn)return;
-  btn.disabled=loading;
-  btn.innerHTML=loading?`<span class="auth-spinner"></span>${text}`:text;
+function showErr(id, msg) { const el = document.getElementById(id); if(el){el.textContent=msg;el.classList.add('show');} }
+function showOk(id, msg)  { const el = document.getElementById(id); if(el){el.textContent=msg;el.classList.add('show');} }
+function setLoading(btnId, loading, text) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  btn.disabled = loading;
+  btn.innerHTML = loading ? `<span class="auth-spinner"></span>${text}` : text;
 }
 
 async function doLogin() {
   clearAuthMsgs();
-  const email=document.getElementById('loginEmail').value.trim();
-  const pass=document.getElementById('loginPass').value;
-  if(!email||!pass){showErr('loginErr','Preencha e-mail e senha.');return;}
-  setLoading('btnLogin',true,'Entrando...');
-  const {error}=await supa.auth.signInWithPassword({email,password:pass});
-  setLoading('btnLogin',false,'Entrar');
-  if(error){showErr('loginErr',traduzErro(error.message));}
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPass').value;
+  if (!email || !pass) { showErr('loginErr', 'Preencha e-mail e senha.'); return; }
+  setLoading('btnLogin', true, 'Entrando...');
+  const { error } = await supa.auth.signInWithPassword({ email, password: pass });
+  setLoading('btnLogin', false, 'Entrar');
+  if (error) { showErr('loginErr', traduzErro(error.message)); return; }
+  // onAuthStateChange cuida do resto
 }
 
 async function doRegister() {
   clearAuthMsgs();
-  const name=document.getElementById('regName').value.trim();
-  const email=document.getElementById('regEmail').value.trim();
-  const pass=document.getElementById('regPass').value;
-  const pass2=document.getElementById('regPass2').value;
-  if(!name){showErr('regErr','Informe seu nome.');return;}
-  if(!email){showErr('regErr','Informe um e-mail.');return;}
-  if(pass.length<6){showErr('regErr','Senha deve ter pelo menos 6 caracteres.');return;}
-  if(pass!==pass2){showErr('regErr','As senhas não coincidem.');return;}
-  setLoading('btnRegister',true,'Criando conta...');
-  const {error}=await supa.auth.signUp({email,password:pass,options:{data:{full_name:name}}});
-  setLoading('btnRegister',false,'Criar conta');
-  if(error){showErr('regErr',traduzErro(error.message));return;}
-  showOk('regOk','✓ Conta criada! Verifique seu e-mail para confirmar.');
+  const name  = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const pass  = document.getElementById('regPass').value;
+  const pass2 = document.getElementById('regPass2').value;
+  if (!name)          { showErr('regErr', 'Informe seu nome.'); return; }
+  if (!email)         { showErr('regErr', 'Informe um e-mail.'); return; }
+  if (pass.length < 6){ showErr('regErr', 'Senha mínimo 6 caracteres.'); return; }
+  if (pass !== pass2) { showErr('regErr', 'As senhas não coincidem.'); return; }
+  setLoading('btnRegister', true, 'Criando...');
+  const { error } = await supa.auth.signUp({ email, password: pass, options: { data: { full_name: name } } });
+  setLoading('btnRegister', false, 'Criar conta');
+  if (error) { showErr('regErr', traduzErro(error.message)); return; }
+  showOk('regOk', '✓ Conta criada! Verifique seu e-mail.');
 }
 
 async function doGoogleLogin() {
-  ['btnGoogleLogin','btnGoogleReg'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el){el.disabled=true;el.innerHTML='<span class="auth-spinner"></span>Aguarde...';}
+  ['btnGoogleLogin','btnGoogleReg'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.disabled = true; el.innerHTML = '<span class="auth-spinner"></span>Aguarde...'; }
   });
   await supa.auth.signInWithOAuth({
-    provider:'google',
-    options:{redirectTo:'https://paulfilmes.github.io/Clientes/'}
+    provider: 'google',
+    options: { redirectTo: 'https://paulfilmes.github.io/Clientes/' }
   });
 }
 
-async function doLogout() {
-  if(!confirm('Deseja sair da sua conta?')) return;
-  // 1. Faz signOut no Supabase
-  try { await supa.auth.signOut({scope:'local'}); } catch(e){}
-  // 2. Limpa TODAS as chaves de sessão do Supabase no localStorage
-  const toRemove=[];
-  for(let i=0;i<localStorage.length;i++){
-    const k=localStorage.key(i);
-    if(k&&(k.startsWith('sb-')||k.includes('supabase')||k.includes('-auth-')))toRemove.push(k);
-  }
-  toRemove.forEach(k=>localStorage.removeItem(k));
-  // 3. Reseta estado local
-  currentUserId=null;
-  currentUserEmail='';
-  _appReady=false;
-  D={clients:[],nextId:1};
-  // 4. Mostra tela de login SEM recarregar
-  document.getElementById('authScreen').classList.remove('hidden');
-  document.getElementById('userBadge').style.display='none';
-}
-
-function traduzErro(msg){
-  if(msg.includes('Invalid login'))return 'E-mail ou senha incorretos.';
-  if(msg.includes('Email not confirmed'))return 'Confirme seu e-mail antes de entrar.';
-  if(msg.includes('already registered'))return 'Este e-mail já está cadastrado.';
-  if(msg.includes('Password should'))return 'Senha deve ter pelo menos 6 caracteres.';
-  if(msg.includes('rate limit'))return 'Muitas tentativas. Aguarde alguns minutos.';
+function traduzErro(msg) {
+  if (msg.includes('Invalid login'))       return 'E-mail ou senha incorretos.';
+  if (msg.includes('Email not confirmed')) return 'Confirme seu e-mail antes de entrar.';
+  if (msg.includes('already registered'))  return 'Este e-mail já está cadastrado.';
+  if (msg.includes('Password should'))     return 'Senha mínimo 6 caracteres.';
+  if (msg.includes('rate limit'))          return 'Muitas tentativas. Aguarde.';
   return msg;
 }
 
-function enterApp(user) {
-  document.getElementById('authScreen').classList.add('hidden');
-  const badge=document.getElementById('userBadge');
-  badge.style.display='flex';
-  const name=user.user_metadata?.full_name||user.email.split('@')[0];
-  const photo=user.user_metadata?.avatar_url||null;
-  document.getElementById('ubName').textContent=name.split(' ')[0];
-  const avEl=document.getElementById('ubAv');
-  if(photo){
-    avEl.innerHTML=`<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
-  } else {
-    avEl.textContent=name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+// ══════════════════════════════════════
+// LOGOUT — abordagem direta e confiável
+// ══════════════════════════════════════
+async function doLogout() {
+  if (!confirm('Deseja sair da sua conta?')) return;
+
+  // Desativa o listener antes de fazer signOut para não re-triggar
+  authListenerActive = false;
+
+  try { await supa.auth.signOut(); } catch(e) { console.log('signOut error (ignorado):', e); }
+
+  // Limpa TODAS as chaves do Supabase no localStorage
+  const toRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && (k.startsWith('sb-') || k.includes('supabase') || k.includes('gotrue'))) {
+      toRemove.push(k);
+    }
   }
+  toRemove.forEach(k => localStorage.removeItem(k));
+
+  // Reseta estado
+  currentUserId = null;
+  currentUserEmail = '';
+  D = { clients: [], nextId: 1 };
+
+  // Mostra tela de login
+  showLoginScreen();
+
+  // Reativa listener após um tick
+  setTimeout(() => { authListenerActive = true; }, 500);
 }
 
-// Escuta mudanças de sessão — com flag para evitar duplo disparo
+// ══════════════════════════════════════
+// AUTH STATE LISTENER
+// ══════════════════════════════════════
+let authListenerActive = true;
+let lastHandledUserId = null;
+
 supa.auth.onAuthStateChange(async (event, session) => {
-  // Ignora eventos que não são de login/logout real
-  if(event === 'TOKEN_REFRESHED') return;
+  // Ignora se listener desativado (durante logout)
+  if (!authListenerActive) return;
 
-  if(session?.user) {
-    // Se já está pronto com o mesmo usuário, não faz nada
-    if(_appReady && currentUserId === session.user.id) return;
+  // Ignora refresh de token — não precisa recarregar dados
+  if (event === 'TOKEN_REFRESHED') return;
 
-    currentUserId = session.user.id;
+  if (session?.user) {
+    const uid = session.user.id;
+
+    // Já processou esse usuário — ignora disparo duplo
+    if (uid === lastHandledUserId) return;
+    lastHandledUserId = uid;
+
+    currentUserId = uid;
     currentUserEmail = session.user.email || '';
-    _appReady = true;
 
-    enterApp(session.user);
-    await loadFromSupabase();
+    showApp(session.user);
+    await loadData();
     renderSB();
     renderDash();
   } else {
-    // Logout real
-    if(!_appReady && !currentUserId) return; // já estava deslogado
+    // Sessão encerrada
+    if (!lastHandledUserId) return; // já estava sem sessão
+    lastHandledUserId = null;
     currentUserId = null;
     currentUserEmail = '';
-    _appReady = false;
-    D = {clients:[], nextId:1};
-    document.getElementById('authScreen').classList.remove('hidden');
-    document.getElementById('userBadge').style.display='none';
+    D = { clients: [], nextId: 1 };
+    showLoginScreen();
   }
 });
 
 // ══════════════════════════════════════
-// DATA — localStorage + Supabase
+// DATA — carga e persistência
 // ══════════════════════════════════════
 
-// Lê dados do localStorage (varre todas as chaves)
+// Busca dados do localStorage (chave pf_v4 ou varre tudo)
 function getLocalData() {
-  let best = null;
-  let bestCount = 0;
-  const keys = [];
+  // Tenta primeiro a chave exata conhecida
   try {
-    for(let i=0;i<localStorage.length;i++){
-      const k=localStorage.key(i);
-      if(k&&!k.startsWith('sb-')&&!k.includes('supabase')&&!k.includes('-auth-')) keys.push(k);
-    }
-  } catch(e){}
-  // Garante que as chaves conhecidas estejam na lista
-  ['pf_v4','pf_v3','pf_v2','pf_v1','paulfilmes_data'].forEach(k=>{if(!keys.includes(k))keys.push(k);});
-
-  for(const k of keys){
-    try{
-      const raw=localStorage.getItem(k);
-      if(!raw||raw.length<20)continue;
-      const p=JSON.parse(raw);
-      if(p&&Array.isArray(p.clients)&&p.clients.length>bestCount){
-        best=p; bestCount=p.clients.length;
-        console.log('[PF] localStorage encontrado:', k, '→', p.clients.length, 'clientes');
+    const raw = localStorage.getItem(SK_LOCAL);
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p?.clients?.length > 0) {
+        console.log('[PF] localStorage pf_v4:', p.clients.length, 'clientes');
+        return p;
       }
-    }catch(e){}
-  }
+    }
+  } catch(e) {}
+
+  // Varre outras chaves como fallback
+  let best = null, bestCount = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || k.startsWith('sb-') || k.includes('supabase') || k.includes('gotrue')) continue;
+      try {
+        const p = JSON.parse(localStorage.getItem(k));
+        if (p?.clients?.length > bestCount) {
+          best = p; bestCount = p.clients.length;
+          console.log('[PF] localStorage fallback key:', k, '→', bestCount, 'clientes');
+        }
+      } catch(e) {}
+    }
+  } catch(e) {}
   return best;
 }
 
-// Carrega dados: Supabase primeiro, localStorage como migração/fallback
-async function loadFromSupabase() {
-  if(!currentUserId) return;
+// Carrega dados: Supabase > migração do localStorage > vazio
+async function loadData() {
+  if (!currentUserId) return;
 
   try {
-    const {data, error} = await supa
+    // 1. Tenta buscar do Supabase
+    const { data, error } = await supa
       .from('user_data')
       .select('data')
       .eq('user_id', currentUserId)
       .single();
 
-    const supaErr = error && error.code !== 'PGRST116'; // PGRST116 = row not found (normal)
+    // Erro real (não é "row not found")
+    if (error && error.code !== 'PGRST116') {
+      console.error('[PF] Erro Supabase:', error);
+      // Usa localStorage como fallback de emergência
+      const local = getLocalData();
+      if (local) D = local;
+      return;
+    }
 
-    if(!supaErr && data?.data?.clients?.length > 0) {
-      // ✅ Tem dados no Supabase — usa direto
+    // 2. Tem dados no Supabase com clientes
+    if (data?.data?.clients?.length > 0) {
       D = data.data;
-      if(!D.nextId) D.nextId = (D.clients.reduce((m,c)=>Math.max(m,c.id),0)+1)||1;
-      console.log('[PF] Dados carregados do Supabase:', D.clients.length, 'clientes');
+      if (!D.nextId) D.nextId = Math.max(...D.clients.map(c => c.id), 0) + 1;
+      console.log('[PF] Dados do Supabase:', D.clients.length, 'clientes');
       return;
     }
 
-    // Sem dados no Supabase — tenta migrar do localStorage
+    // 3. Sem dados no Supabase — tenta migrar do localStorage
     const local = getLocalData();
-    if(local?.clients?.length > 0) {
+    if (local?.clients?.length > 0) {
       D = local;
-      if(!D.nextId) D.nextId = (D.clients.reduce((m,c)=>Math.max(m,c.id),0)+1)||1;
-      console.log('[PF] Migrando localStorage → Supabase:', D.clients.length, 'clientes');
-      await saveToSupabase();
-      showToast('✓ Histórico restaurado com sucesso!');
+      if (!D.nextId) D.nextId = Math.max(...D.clients.map(c => c.id), 0) + 1;
+      console.log('[PF] Migrando para Supabase:', D.clients.length, 'clientes');
+      await saveData();
+      setTimeout(() => showToast('✓ Histórico restaurado!'), 500);
       return;
     }
 
-    // Sem dados em lugar nenhum
-    D = {clients:[], nextId:1};
-    if(supaErr) { console.error('[PF] Erro Supabase:', error); return; }
-    // Salva registro vazio para garantir que próximas consultas encontrem a linha
-    await saveToSupabase();
+    // 4. Nada encontrado — começa vazio
+    D = { clients: [], nextId: 1 };
+    await saveData();
+    console.log('[PF] Usuário novo — iniciando vazio');
 
   } catch(e) {
-    console.error('[PF] Erro crítico em loadFromSupabase:', e);
+    console.error('[PF] Erro crítico loadData:', e);
     const local = getLocalData();
-    D = local || {clients:[], nextId:1};
+    D = local || { clients: [], nextId: 1 };
   }
 }
 
 // Salva no Supabase
-async function saveToSupabase() {
-  if(!currentUserId) return;
+async function saveData() {
+  if (!currentUserId) return;
   try {
-    const {error} = await supa
+    const { error } = await supa
       .from('user_data')
       .upsert(
-        {user_id: currentUserId, data: D, updated_at: new Date().toISOString()},
-        {onConflict: 'user_id'}
+        { user_id: currentUserId, data: D, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id' }
       );
-    if(error) console.error('[PF] Erro ao salvar Supabase:', error);
+    if (error) console.error('[PF] Erro ao salvar:', error);
   } catch(e) {
-    console.error('[PF] Erro saveToSupabase:', e);
+    console.error('[PF] saveData error:', e);
   }
 }
 
-function save() { saveToSupabase(); }
+// save() é chamado em toda alteração de dados
+function save() { saveData(); }
 
-function loadInitialData(){
-  D.clients=[
+function loadInitialData() {
+  D.clients = [
     {id:1,name:'Life Pilates',status:'ativo',tipo:'avulso',photo:null,obs:'Indicaram novo cliente → 50% desconto na 2ª captação.',captacoes:[
       {id:'c1a',num:1,dataCap:'2025-04-14T09:00',dataPag:'2025-04-14T09:00',valor:1000,pagSt:'recebido',hasDisc:false,valOrig:1300,disc:300,motDisc:'',hasInd:false,quemInd:'',discInd:0,obs:'Primeira captação'},
       {id:'c1b',num:2,dataCap:'2025-05-29T09:00',dataPag:'2025-05-29T09:00',valor:500,pagSt:'recebido',hasDisc:true,valOrig:1300,disc:800,motDisc:'50% desconto por indicação',hasInd:true,quemInd:'Life Pilates',discInd:650,obs:'50% de desconto — indicaram cliente que fechou'}
@@ -770,8 +812,11 @@ function loadInitialData(){
     {id:5,name:'Emagrecentro JVL',status:'validacao',tipo:'validacao',photo:null,obs:'Vídeo de validação gratuito.',captacoes:[
       {id:'c5a',num:1,dataCap:'2025-06-08T09:00',dataPag:'2025-06-08T09:00',valor:0,pagSt:'gratuito',hasDisc:false,valOrig:0,disc:0,motDisc:'',hasInd:false,quemInd:'',discInd:0,obs:'1 vídeo gratuito de validação'}
     ]}
-  ];D.nextId=6;save();
+  ];
+  D.nextId = 6;
+  save();
 }
+
 
 // ══════════════════════════════════════
 // HELPERS
