@@ -321,9 +321,6 @@ td.mz{color:var(--t3);}
       <div class="sep"></div>
       <div class="slbl">Clientes</div>
       <div id="sbClients"></div>
-      <div style="margin-top:auto;padding-top:12px;">
-        <button class="btn btn-p" style="width:100%;justify-content:center;font-size:12px;" onclick="openAddClient()">+ Novo Cliente</button>
-      </div>
     </div>
   </aside>
 
@@ -592,9 +589,11 @@ async function doGoogleLogin() {
 async function doLogout() {
   if(!confirm('Deseja sair da sua conta?')) return;
   currentUserId = null;
+  currentUserEmail = '';
   D = {clients:[], nextId:1};
   await supa.auth.signOut();
-  location.reload();
+  document.getElementById('authScreen').classList.remove('hidden');
+  document.getElementById('userBadge').style.display = 'none';
 }
 
 function traduzErro(msg) {
@@ -646,7 +645,25 @@ let currentUserEmail = '';
 let D = {clients:[], nextId:1};
 const MN=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-// Carrega dados do Supabase para o usuário logado
+// Tenta recuperar dados do localStorage (versões antigas)
+function getLocalStorageData() {
+  const keys = ['pf_v4','pf_v3','pf_v2','pf_v1','paulfilmes_data'];
+  for(const k of keys) {
+    try {
+      const raw = localStorage.getItem(k);
+      if(raw) {
+        const parsed = JSON.parse(raw);
+        if(parsed && parsed.clients && parsed.clients.length > 0) {
+          console.log('Dados locais encontrados na chave:', k, '— clientes:', parsed.clients.length);
+          return parsed;
+        }
+      }
+    } catch(e) {}
+  }
+  return null;
+}
+
+// Carrega dados do Supabase; migra localStorage se necessário
 async function loadFromSupabase() {
   if(!currentUserId) return;
   try {
@@ -658,25 +675,40 @@ async function loadFromSupabase() {
 
     if(error && error.code !== 'PGRST116') {
       console.error('Erro ao carregar dados:', error);
+      // Fallback: tenta localStorage
+      const local = getLocalStorageData();
+      if(local) { D = local; }
       return;
     }
 
-    if(data && data.data) {
+    if(data && data.data && data.data.clients && data.data.clients.length > 0) {
+      // Dados já salvos no Supabase — usa eles
       D = data.data;
       if(!D.clients) D.clients = [];
       if(!D.nextId) D.nextId = 1;
     } else {
-      // Primeira vez — verifica se é o dono para carregar dados iniciais
-      D = {clients:[], nextId:1};
-      if(currentUserEmail.toLowerCase() === OWNER_EMAIL.toLowerCase()) {
+      // Ainda sem dados no Supabase — verifica localStorage para migrar
+      const local = getLocalStorageData();
+      if(local && local.clients && local.clients.length > 0) {
+        // Migração: copia dados locais para o Supabase
+        D = local;
+        showToast('✓ Dados migrados com sucesso!');
+        await saveToSupabase();
+      } else if(currentUserEmail.toLowerCase() === OWNER_EMAIL.toLowerCase()) {
+        // Dono sem dados em lugar nenhum: carrega dados iniciais
+        D = {clients:[], nextId:1};
         loadInitialData();
       } else {
-        await saveToSupabase(); // salva registro vazio para o novo usuário
+        // Outro usuário, sem dados: começa zerado
+        D = {clients:[], nextId:1};
+        await saveToSupabase();
       }
     }
   } catch(e) {
     console.error('Erro loadFromSupabase:', e);
-    D = {clients:[], nextId:1};
+    // Fallback total: tenta localStorage
+    const local = getLocalStorageData();
+    if(local) { D = local; } else { D = {clients:[], nextId:1}; }
   }
 }
 
