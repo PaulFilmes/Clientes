@@ -501,26 +501,24 @@ td.mz{color:var(--t3);}
 <div class="toast" id="toast"></div>
 
 <script>
-// ══════════════════════════════════════
-// SUPABASE CONFIG
-// ══════════════════════════════════════
-const SUPA_URL = 'https://zchlkfieegfrmdvovzht.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjaGxrZmllZWdmcm1kdm92emh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExODY4MDksImV4cCI6MjA5Njc2MjgwOX0.nkTy4DEpKxPqGx_I0LW5wKSeRnxGV-u19KTWqRpfX_c';
-const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
-const OWNER_EMAIL = 'juniorpaul1910@gmail.com';
-const SK_LOCAL = 'pf_v4'; // chave do localStorage com os dados antigos
+// ─────────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────────
+const SUPA_URL  = 'https://zchlkfieegfrmdvovzht.supabase.co';
+const SUPA_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpjaGxrZmllZWdmcm1kdm92emh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExODY4MDksImV4cCI6MjA5Njc2MjgwOX0.nkTy4DEpKxPqGx_I0LW5wKSeRnxGV-u19KTWqRpfX_c';
+const supa      = supabase.createClient(SUPA_URL, SUPA_KEY);
 
-// ══════════════════════════════════════
-// STATE
-// ══════════════════════════════════════
-let currentUserId = null;
+// ─────────────────────────────────────────────────
+// ESTADO GLOBAL
+// ─────────────────────────────────────────────────
+let currentUserId    = null;
 let currentUserEmail = '';
-let D = {clients:[], nextId:1};
+let D = { clients: [], nextId: 1 };
 const MN = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-// ══════════════════════════════════════
-// SHOW / HIDE APP
-// ══════════════════════════════════════
+// ─────────────────────────────────────────────────
+// UI — mostrar / esconder tela
+// ─────────────────────────────────────────────────
 function showLoginScreen() {
   document.getElementById('authScreen').classList.remove('hidden');
   document.getElementById('userBadge').style.display = 'none';
@@ -530,26 +528,26 @@ function showApp(user) {
   document.getElementById('authScreen').classList.add('hidden');
   const badge = document.getElementById('userBadge');
   badge.style.display = 'flex';
-  const name = user.user_metadata?.full_name || user.email.split('@')[0];
+  const name  = user.user_metadata?.full_name || user.email.split('@')[0];
   const photo = user.user_metadata?.avatar_url || null;
   document.getElementById('ubName').textContent = name.split(' ')[0];
-  const avEl = document.getElementById('ubAv');
+  const av = document.getElementById('ubAv');
   if (photo) {
-    avEl.innerHTML = `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    av.innerHTML = `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
   } else {
-    avEl.textContent = name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+    av.textContent = name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
   }
 }
 
-// ══════════════════════════════════════
-// AUTH FORMS
-// ══════════════════════════════════════
+// ─────────────────────────────────────────────────
+// AUTH — login / register / google / logout
+// ─────────────────────────────────────────────────
 function switchTab(tab) {
   const isLogin = tab === 'login';
   document.getElementById('tabLogin').classList.toggle('act', isLogin);
   document.getElementById('tabReg').classList.toggle('act', !isLogin);
   document.getElementById('paneLogin').style.display = isLogin ? '' : 'none';
-  document.getElementById('paneReg').style.display = isLogin ? 'none' : '';
+  document.getElementById('paneReg').style.display   = isLogin ? 'none' : '';
   clearAuthMsgs();
 }
 function clearAuthMsgs() {
@@ -558,13 +556,13 @@ function clearAuthMsgs() {
     if (el) { el.textContent = ''; el.classList.remove('show'); }
   });
 }
-function showErr(id, msg) { const el = document.getElementById(id); if(el){el.textContent=msg;el.classList.add('show');} }
-function showOk(id, msg)  { const el = document.getElementById(id); if(el){el.textContent=msg;el.classList.add('show');} }
-function setLoading(btnId, loading, text) {
-  const btn = document.getElementById(btnId);
-  if (!btn) return;
-  btn.disabled = loading;
-  btn.innerHTML = loading ? `<span class="auth-spinner"></span>${text}` : text;
+function showErr(id, msg) { const el = document.getElementById(id); if (el) { el.textContent = msg; el.classList.add('show'); } }
+function showOk(id, msg)  { const el = document.getElementById(id); if (el) { el.textContent = msg; el.classList.add('show'); } }
+function setLoading(id, on, txt) {
+  const b = document.getElementById(id);
+  if (!b) return;
+  b.disabled = on;
+  b.innerHTML = on ? `<span class="auth-spinner"></span>${txt}` : txt;
 }
 
 async function doLogin() {
@@ -576,7 +574,7 @@ async function doLogin() {
   const { error } = await supa.auth.signInWithPassword({ email, password: pass });
   setLoading('btnLogin', false, 'Entrar');
   if (error) { showErr('loginErr', traduzErro(error.message)); return; }
-  // onAuthStateChange cuida do resto
+  await handleLogin();
 }
 
 async function doRegister() {
@@ -585,10 +583,10 @@ async function doRegister() {
   const email = document.getElementById('regEmail').value.trim();
   const pass  = document.getElementById('regPass').value;
   const pass2 = document.getElementById('regPass2').value;
-  if (!name)          { showErr('regErr', 'Informe seu nome.'); return; }
-  if (!email)         { showErr('regErr', 'Informe um e-mail.'); return; }
-  if (pass.length < 6){ showErr('regErr', 'Senha mínimo 6 caracteres.'); return; }
-  if (pass !== pass2) { showErr('regErr', 'As senhas não coincidem.'); return; }
+  if (!name)           { showErr('regErr', 'Informe seu nome.'); return; }
+  if (!email)          { showErr('regErr', 'Informe um e-mail.'); return; }
+  if (pass.length < 6) { showErr('regErr', 'Senha mínimo 6 caracteres.'); return; }
+  if (pass !== pass2)  { showErr('regErr', 'As senhas não coincidem.'); return; }
   setLoading('btnRegister', true, 'Criando...');
   const { error } = await supa.auth.signUp({ email, password: pass, options: { data: { full_name: name } } });
   setLoading('btnRegister', false, 'Criar conta');
@@ -605,6 +603,29 @@ async function doGoogleLogin() {
     provider: 'google',
     options: { redirectTo: 'https://paulfilmes.github.io/Clientes/' }
   });
+  // Página vai ser redirecionada — ao voltar, init() cuida do resto
+}
+
+// LOGOUT — simples e direto
+async function doLogout() {
+  if (!confirm('Deseja sair da sua conta?')) return;
+
+  // Apaga TODAS as chaves de sessão do Supabase no localStorage
+  const remove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && (k.startsWith('sb-') || k.includes('supabase'))) remove.push(k);
+  }
+  remove.forEach(k => localStorage.removeItem(k));
+
+  // Faz signOut (pode falhar, não importa — já limpamos o localStorage)
+  try { await supa.auth.signOut(); } catch(e) {}
+
+  // Reseta estado e mostra login
+  currentUserId = null;
+  currentUserEmail = '';
+  D = { clients: [], nextId: 1 };
+  showLoginScreen();
 }
 
 function traduzErro(msg) {
@@ -616,218 +637,119 @@ function traduzErro(msg) {
   return msg;
 }
 
-// ══════════════════════════════════════
-// LOGOUT — abordagem direta e confiável
-// ══════════════════════════════════════
-async function doLogout() {
-  if (!confirm('Deseja sair da sua conta?')) return;
+// ─────────────────────────────────────────────────
+// DADOS — localStorage (migração) + Supabase
+// ─────────────────────────────────────────────────
 
-  // Desativa o listener antes de fazer signOut para não re-triggar
-  authListenerActive = false;
-
-  try { await supa.auth.signOut(); } catch(e) { console.log('signOut error (ignorado):', e); }
-
-  // Limpa TODAS as chaves do Supabase no localStorage
-  const toRemove = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (k && (k.startsWith('sb-') || k.includes('supabase') || k.includes('gotrue'))) {
-      toRemove.push(k);
-    }
-  }
-  toRemove.forEach(k => localStorage.removeItem(k));
-
-  // Reseta estado
-  currentUserId = null;
-  currentUserEmail = '';
-  D = { clients: [], nextId: 1 };
-
-  // Mostra tela de login
-  showLoginScreen();
-
-  // Reativa listener após um tick
-  setTimeout(() => { authListenerActive = true; }, 500);
-}
-
-// ══════════════════════════════════════
-// AUTH STATE LISTENER
-// ══════════════════════════════════════
-let authListenerActive = true;
-let lastHandledUserId = null;
-
-supa.auth.onAuthStateChange(async (event, session) => {
-  // Ignora se listener desativado (durante logout)
-  if (!authListenerActive) return;
-
-  // Ignora refresh de token — não precisa recarregar dados
-  if (event === 'TOKEN_REFRESHED') return;
-
-  if (session?.user) {
-    const uid = session.user.id;
-
-    // Já processou esse usuário — ignora disparo duplo
-    if (uid === lastHandledUserId) return;
-    lastHandledUserId = uid;
-
-    currentUserId = uid;
-    currentUserEmail = session.user.email || '';
-
-    showApp(session.user);
-    await loadData();
-    renderSB();
-    renderDash();
-  } else {
-    // Sessão encerrada
-    if (!lastHandledUserId) return; // já estava sem sessão
-    lastHandledUserId = null;
-    currentUserId = null;
-    currentUserEmail = '';
-    D = { clients: [], nextId: 1 };
-    showLoginScreen();
-  }
-});
-
-// ══════════════════════════════════════
-// DATA — carga e persistência
-// ══════════════════════════════════════
-
-// Busca dados do localStorage (chave pf_v4 ou varre tudo)
+// Lê pf_v4 do localStorage (dados antigos do usuário)
 function getLocalData() {
-  // Tenta primeiro a chave exata conhecida
   try {
-    const raw = localStorage.getItem(SK_LOCAL);
+    const raw = localStorage.getItem('pf_v4');
     if (raw) {
       const p = JSON.parse(raw);
-      if (p?.clients?.length > 0) {
-        console.log('[PF] localStorage pf_v4:', p.clients.length, 'clientes');
-        return p;
-      }
+      if (p && Array.isArray(p.clients) && p.clients.length > 0) return p;
     }
   } catch(e) {}
-
-  // Varre outras chaves como fallback
-  let best = null, bestCount = 0;
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k || k.startsWith('sb-') || k.includes('supabase') || k.includes('gotrue')) continue;
-      try {
-        const p = JSON.parse(localStorage.getItem(k));
-        if (p?.clients?.length > bestCount) {
-          best = p; bestCount = p.clients.length;
-          console.log('[PF] localStorage fallback key:', k, '→', bestCount, 'clientes');
-        }
-      } catch(e) {}
-    }
-  } catch(e) {}
-  return best;
+  return null;
 }
 
-// Carrega dados: Supabase > migração do localStorage > vazio
-async function loadData() {
-  if (!currentUserId) return;
-
+// Carrega dados do Supabase para o usuário logado.
+// NUNCA sobrescreve dados existentes de outro usuário.
+async function loadData(userId) {
   try {
-    // 1. Busca no Supabase
     const { data, error } = await supa
       .from('user_data')
       .select('data')
-      .eq('user_id', currentUserId)
+      .eq('user_id', userId)
       .single();
 
-    const rowNotFound = error && error.code === 'PGRST116';
-    const realError   = error && error.code !== 'PGRST116';
-
-    // Erro de conexão — usa localStorage como fallback, NÃO salva nada
-    if (realError) {
-      console.error('[PF] Erro Supabase:', error);
-      const local = getLocalData();
-      if (local) D = local;
-      return;
-    }
-
-    // 2. Supabase tem dados — usa direto, NUNCA sobrescreve
-    if (data?.data?.clients?.length > 0) {
+    // Linha encontrada com clientes — usa direto
+    if (!error && data?.data?.clients?.length > 0) {
       D = data.data;
-      if (!D.nextId) D.nextId = Math.max(...D.clients.map(c => c.id), 0) + 1;
-      console.log('[PF] Dados do Supabase:', D.clients.length, 'clientes');
+      if (!D.nextId) D.nextId = Math.max(...D.clients.map(c => +c.id || 0), 0) + 1;
       return;
     }
 
-    // 3. Supabase vazio/sem linha — tenta migrar do localStorage
-    //    Isso só acontece na PRIMEIRA vez que esse user_id usa o sistema
-    if (rowNotFound || !data?.data?.clients?.length) {
+    // Linha não existe (PGRST116) — primeira vez desse usuário
+    if (error?.code === 'PGRST116') {
+      // Tenta migrar do localStorage
       const local = getLocalData();
-      if (local?.clients?.length > 0) {
-        // Migra localStorage → Supabase (INSERT, não UPDATE)
+      if (local) {
         D = local;
-        if (!D.nextId) D.nextId = Math.max(...D.clients.map(c => c.id), 0) + 1;
-        console.log('[PF] Migrando localStorage → Supabase:', D.clients.length, 'clientes');
-        await saveData();
-        setTimeout(() => showToast('✓ Histórico restaurado!'), 500);
+        if (!D.nextId) D.nextId = Math.max(...D.clients.map(c => +c.id || 0), 0) + 1;
+        await saveData(userId);  // cria a linha no Supabase
+        setTimeout(() => showToast('✓ Histórico restaurado!'), 800);
         return;
       }
-
-      // 4. Nenhum dado em lugar nenhum — usuário realmente novo, inicia vazio
-      //    Só salva no Supabase se a linha realmente não existe (rowNotFound)
+      // Nenhum dado — inicia vazio e cria linha
       D = { clients: [], nextId: 1 };
-      if (rowNotFound) {
-        // Cria linha vazia só para esse user_id — não toca outros usuários
-        await saveData();
-        console.log('[PF] Novo usuário registrado no Supabase');
-      }
+      await saveData(userId);
+      return;
     }
 
+    // Linha existe mas sem clientes — NÃO sobrescreve, apenas usa vazio
+    D = { clients: [], nextId: 1 };
+
   } catch(e) {
-    console.error('[PF] Erro crítico loadData:', e);
-    // Fallback total — NÃO salva nada para não sobrescrever dados de outros
+    console.error('[PF] loadData error:', e);
+    // Fallback: usa localStorage se disponível (nunca salva)
     const local = getLocalData();
     D = local || { clients: [], nextId: 1 };
   }
 }
 
-// Salva no Supabase
-async function saveData() {
-  if (!currentUserId) return;
+// Salva dados para um userId específico
+async function saveData(userId) {
+  const uid = userId || currentUserId;
+  if (!uid) return;
   try {
     const { error } = await supa
       .from('user_data')
-      .upsert(
-        { user_id: currentUserId, data: D, updated_at: new Date().toISOString() },
-        { onConflict: 'user_id' }
-      );
-    if (error) console.error('[PF] Erro ao salvar:', error);
+      .upsert({ user_id: uid, data: D, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    if (error) console.error('[PF] saveData error:', error);
   } catch(e) {
-    console.error('[PF] saveData error:', e);
+    console.error('[PF] saveData exception:', e);
   }
 }
 
-// save() é chamado em toda alteração de dados
+// save() chamado em toda alteração
 function save() { saveData(); }
 
-function loadInitialData() {
-  D.clients = [
-    {id:1,name:'Life Pilates',status:'ativo',tipo:'avulso',photo:null,obs:'Indicaram novo cliente → 50% desconto na 2ª captação.',captacoes:[
-      {id:'c1a',num:1,dataCap:'2025-04-14T09:00',dataPag:'2025-04-14T09:00',valor:1000,pagSt:'recebido',hasDisc:false,valOrig:1300,disc:300,motDisc:'',hasInd:false,quemInd:'',discInd:0,obs:'Primeira captação'},
-      {id:'c1b',num:2,dataCap:'2025-05-29T09:00',dataPag:'2025-05-29T09:00',valor:500,pagSt:'recebido',hasDisc:true,valOrig:1300,disc:800,motDisc:'50% desconto por indicação',hasInd:true,quemInd:'Life Pilates',discInd:650,obs:'50% de desconto — indicaram cliente que fechou'}
-    ]},
-    {id:2,name:'Dra. Caroline',status:'inativo',tipo:'avulso',photo:null,obs:'Não seguiu com produções.',captacoes:[
-      {id:'c2a',num:1,dataCap:'2025-04-29T09:00',dataPag:'2025-04-29T09:00',valor:800,pagSt:'recebido',hasDisc:true,valOrig:1300,disc:500,motDisc:'Desconto para atrair cliente',hasInd:false,quemInd:'',discInd:0,obs:'Cliente não deu continuidade'}
-    ]},
-    {id:3,name:'Laryssa Goedert',status:'aguardando',tipo:'avulso',photo:null,obs:'Data marcada mas captação ainda não realizada.',captacoes:[
-      {id:'c3a',num:1,dataCap:'2025-06-17T09:00',dataPag:'2025-06-17T09:00',valor:1000,pagSt:'pendente',hasDisc:true,valOrig:1300,disc:300,motDisc:'Desconto para atrair',hasInd:false,quemInd:'',discInd:0,obs:'Captação ainda não realizada'}
-    ]},
-    {id:4,name:'KN Laboratórios',status:'aguardando',tipo:'avulso',photo:null,obs:'Sem data definida ainda.',captacoes:[
-      {id:'c4a',num:1,dataCap:'',dataPag:'',valor:1300,pagSt:'pendente',hasDisc:false,valOrig:1300,disc:0,motDisc:'',hasInd:false,quemInd:'',discInd:0,obs:'Sem data definida'}
-    ]},
-    {id:5,name:'Emagrecentro JVL',status:'validacao',tipo:'validacao',photo:null,obs:'Vídeo de validação gratuito.',captacoes:[
-      {id:'c5a',num:1,dataCap:'2025-06-08T09:00',dataPag:'2025-06-08T09:00',valor:0,pagSt:'gratuito',hasDisc:false,valOrig:0,disc:0,motDisc:'',hasInd:false,quemInd:'',discInd:0,obs:'1 vídeo gratuito de validação'}
-    ]}
-  ];
-  D.nextId = 6;
-  save();
+// ─────────────────────────────────────────────────
+// INICIALIZAÇÃO — chamada 1x ao carregar a página
+// ─────────────────────────────────────────────────
+async function handleLogin() {
+  // Busca sessão atual
+  const { data: { session } } = await supa.auth.getSession();
+  if (!session?.user) {
+    showLoginScreen();
+    return;
+  }
+  const user = session.user;
+  currentUserId    = user.id;
+  currentUserEmail = user.email || '';
+  showApp(user);
+  await loadData(user.id);
+  renderSB();
+  renderDash();
 }
 
+// Roda ao carregar a página
+(async function init() {
+  // Verifica se há sessão ativa (Google redirect ou session persistida)
+  const { data: { session } } = await supa.auth.getSession();
+  if (session?.user) {
+    const user = session.user;
+    currentUserId    = user.id;
+    currentUserEmail = user.email || '';
+    showApp(user);
+    await loadData(user.id);
+    renderSB();
+    renderDash();
+  } else {
+    showLoginScreen();
+  }
+})();
 
 // ══════════════════════════════════════
 // HELPERS
@@ -1207,6 +1129,7 @@ function delCap(cid,capId){
 function openMo(id){document.getElementById(id).classList.add('open');}
 function closeMo(id){document.getElementById(id).classList.remove('open');}
 document.querySelectorAll('.mo').forEach(o=>o.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');}));
+
 populateYears();
 renderSB();
 renderDash();
