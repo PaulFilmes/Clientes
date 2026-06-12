@@ -588,12 +588,14 @@ async function doGoogleLogin() {
 
 async function doLogout() {
   if(!confirm('Deseja sair da sua conta?')) return;
+  try { await supa.auth.signOut(); } catch(e) {}
   currentUserId = null;
   currentUserEmail = '';
   D = {clients:[], nextId:1};
-  await supa.auth.signOut();
-  document.getElementById('authScreen').classList.remove('hidden');
-  document.getElementById('userBadge').style.display = 'none';
+  Object.keys(localStorage).forEach(k => {
+    if(k.startsWith('sb-') || k.includes('supabase')) localStorage.removeItem(k);
+  });
+  location.href = location.href.split('?')[0].split('#')[0];
 }
 
 function traduzErro(msg) {
@@ -645,22 +647,36 @@ let currentUserEmail = '';
 let D = {clients:[], nextId:1};
 const MN=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-// Tenta recuperar dados do localStorage (versões antigas)
+// Tenta recuperar dados do localStorage (varre TODAS as chaves)
 function getLocalStorageData() {
-  const keys = ['pf_v4','pf_v3','pf_v2','pf_v1','paulfilmes_data'];
-  for(const k of keys) {
+  // Primeiro tenta chaves conhecidas
+  const knownKeys = ['pf_v4','pf_v3','pf_v2','pf_v1','paulfilmes_data','pf_data','clientes'];
+  let best = null;
+  let bestCount = 0;
+  // Varre todas as chaves do localStorage procurando a que tem mais clientes
+  const allKeys = [...knownKeys];
+  try {
+    for(let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if(k && !k.startsWith('sb-') && !k.includes('supabase')) allKeys.push(k);
+    }
+  } catch(e) {}
+  const seen = new Set();
+  for(const k of allKeys) {
+    if(seen.has(k)) continue;
+    seen.add(k);
     try {
       const raw = localStorage.getItem(k);
-      if(raw) {
-        const parsed = JSON.parse(raw);
-        if(parsed && parsed.clients && parsed.clients.length > 0) {
-          console.log('Dados locais encontrados na chave:', k, '— clientes:', parsed.clients.length);
-          return parsed;
-        }
+      if(!raw || raw.length < 10) continue;
+      const parsed = JSON.parse(raw);
+      if(parsed && Array.isArray(parsed.clients) && parsed.clients.length > bestCount) {
+        best = parsed;
+        bestCount = parsed.clients.length;
+        console.log('Dados locais encontrados na chave:', k, '— clientes:', parsed.clients.length);
       }
     } catch(e) {}
   }
-  return null;
+  return best;
 }
 
 // Carrega dados do Supabase; migra localStorage se necessário
