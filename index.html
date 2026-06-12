@@ -728,23 +728,25 @@ async function loadData() {
   if (!currentUserId) return;
 
   try {
-    // 1. Tenta buscar do Supabase
+    // 1. Busca no Supabase
     const { data, error } = await supa
       .from('user_data')
       .select('data')
       .eq('user_id', currentUserId)
       .single();
 
-    // Erro real (não é "row not found")
-    if (error && error.code !== 'PGRST116') {
+    const rowNotFound = error && error.code === 'PGRST116';
+    const realError   = error && error.code !== 'PGRST116';
+
+    // Erro de conexão — usa localStorage como fallback, NÃO salva nada
+    if (realError) {
       console.error('[PF] Erro Supabase:', error);
-      // Usa localStorage como fallback de emergência
       const local = getLocalData();
       if (local) D = local;
       return;
     }
 
-    // 2. Tem dados no Supabase com clientes
+    // 2. Supabase tem dados — usa direto, NUNCA sobrescreve
     if (data?.data?.clients?.length > 0) {
       D = data.data;
       if (!D.nextId) D.nextId = Math.max(...D.clients.map(c => c.id), 0) + 1;
@@ -752,24 +754,33 @@ async function loadData() {
       return;
     }
 
-    // 3. Sem dados no Supabase — tenta migrar do localStorage
-    const local = getLocalData();
-    if (local?.clients?.length > 0) {
-      D = local;
-      if (!D.nextId) D.nextId = Math.max(...D.clients.map(c => c.id), 0) + 1;
-      console.log('[PF] Migrando para Supabase:', D.clients.length, 'clientes');
-      await saveData();
-      setTimeout(() => showToast('✓ Histórico restaurado!'), 500);
-      return;
-    }
+    // 3. Supabase vazio/sem linha — tenta migrar do localStorage
+    //    Isso só acontece na PRIMEIRA vez que esse user_id usa o sistema
+    if (rowNotFound || !data?.data?.clients?.length) {
+      const local = getLocalData();
+      if (local?.clients?.length > 0) {
+        // Migra localStorage → Supabase (INSERT, não UPDATE)
+        D = local;
+        if (!D.nextId) D.nextId = Math.max(...D.clients.map(c => c.id), 0) + 1;
+        console.log('[PF] Migrando localStorage → Supabase:', D.clients.length, 'clientes');
+        await saveData();
+        setTimeout(() => showToast('✓ Histórico restaurado!'), 500);
+        return;
+      }
 
-    // 4. Nada encontrado — começa vazio
-    D = { clients: [], nextId: 1 };
-    await saveData();
-    console.log('[PF] Usuário novo — iniciando vazio');
+      // 4. Nenhum dado em lugar nenhum — usuário realmente novo, inicia vazio
+      //    Só salva no Supabase se a linha realmente não existe (rowNotFound)
+      D = { clients: [], nextId: 1 };
+      if (rowNotFound) {
+        // Cria linha vazia só para esse user_id — não toca outros usuários
+        await saveData();
+        console.log('[PF] Novo usuário registrado no Supabase');
+      }
+    }
 
   } catch(e) {
     console.error('[PF] Erro crítico loadData:', e);
+    // Fallback total — NÃO salva nada para não sobrescrever dados de outros
     const local = getLocalData();
     D = local || { clients: [], nextId: 1 };
   }
