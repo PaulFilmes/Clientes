@@ -145,7 +145,8 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 /* ── DASH CARDS ── */
 .dcard{background:var(--bg3);border:1px solid var(--bd);border-radius:12px;padding:16px 18px;margin-bottom:10px;cursor:pointer;transition:all .15s;}
 .dcard:hover{border-color:var(--bdh);background:var(--bg4);}
-.dcard.inactive-card{opacity:.6;border-style:dashed;}
+.dcard:not(.inactive-card){opacity:1 !important;}
+.dcard.inactive-card{opacity:.5;border-style:dashed;border-color:var(--bd);}
 .dtop{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:9px;}
 .dleft{display:flex;align-items:center;gap:10px;}
 .dav{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:#fff;overflow:hidden;flex-shrink:0;}
@@ -943,7 +944,7 @@ function renderDash(){
   let html = '';
   if (ativos.length) {
     html += `<div class="section-hdr">Clientes Ativos <span style="color:var(--green);font-size:11px">${ativos.length}</span></div>`;
-    html += ativos.map(buildDCard).join('');
+    html += ativos.map(c => buildDCard(c, false)).join('');
   }
   if (inativos.length) {
     html += `<div class="inactive-section"><div class="section-hdr">Clientes Inativos <span style="color:var(--t3);font-size:11px">${inativos.length}</span></div>`;
